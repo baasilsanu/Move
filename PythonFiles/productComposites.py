@@ -51,6 +51,7 @@ def simulate_numba(num_steps, k_e_square, W_e, L_e_plus, W_plus, L_plus_e, eta_b
         phi_plus[1] += phi_plus_dot[1] * dt
 
         R = 0.25 * k * (k_plus_square - k_e_square) * phi_e[0] * phi_plus[0]
+        print(k)
         U_dot = R - r_m * U
         U += U_dot * dt
 

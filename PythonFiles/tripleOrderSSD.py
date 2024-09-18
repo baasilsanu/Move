@@ -5,6 +5,8 @@
 #eqn : dC/dt = A(U)*C + C*Transpose(A(U)) + eps*Q
 #eqn : A(U) = W + UL
 
+#eqn : <WC> + <CW^T> + <ULC> + <UCL^T> + epsilon * Q (Q = <eta * eta ^ T>) 
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -32,6 +34,7 @@ class Simulation:
         self.L_plus_e = np.array([[(-k / (2 * self.k_plus_square)) * (m_u**2 - self.k_e_square), 0],
                                   [0, -k / 2]]) 
         self.U = 0.55053473999083
+        # self.U = 0.01
         # self.C = np.array([[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]])
         self.C = np.array([[0.0001490152423865438,
 -0.056342960706027546,
@@ -67,8 +70,52 @@ class Simulation:
         self.R_History = np.zeros(self.num_steps)
         self.C = self.C.astype(np.float64)
 
+
+
+        self.p = self.k / self.k_e_square
+        self.q = -self.k / self.k_plus_square
+        self.r = self.k * self.N_0_squared
+        self.s = -self.k * (self.k_plus_square - self.m_u**2) / (2*k_e_square)
+        self.t = -self.k * (m_u**2 - self.k_e_square) / (2 * self.k_plus_square)
+        self.v = self.k / 2
+
+        self.bigW = np.array([[-1, self.p, 0, 0], [-self.r, -1, 0, 0], [0, 0, -1, self.q], [0, 0, self.r, -1]])
+        self.bigL = np.array([[0, 0, self.s, 0], [0, 0, 0, self.v], [self.t, 0, 0, 0], [0, -self.v, 0, 0]])
+
+
+
+
+        self.U_3Corr = 0.55053473999083
+        # self.U_3Corr = 0.01
+        self.R_3Corr = 0
+        self.C_3Corr = np.array([[0.0001490152423865438,
+-0.056342960706027546,
+4.705459608940639e-06,
+-0.023997387342599555],
+[-0.056342960706027546,
+153.61445123375822,
+-0.043334023121050586,
+-12.060326483759946],
+[4.705459608940639e-06,
+-0.043334023121050586,
+4.7701541745783226e-05,
+-0.01911624053635777],
+[-0.023997387342599555,
+-12.060326483759946,
+-0.01911624053635777,
+56.7986445738767]])
+        # self.C_3Corr = np.array([[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]])
+        self.C_3Corr = self.C_3Corr.astype(np.float64)
+
+        self.C_History_3Corr = np.zeros((self.num_steps, 4, 4))
+        self.U_History_3Corr = np.zeros(self.num_steps)
+        self.R_History_3Corr = np.zeros(self.num_steps)
+        
+
     def simulate(self):
         for i in range(self.num_steps):
+            # randArr = np.array([(2 * np.sqrt(2) * np.random.normal(0, 1))/np.sqrt(self.k_e_square), 0, 0, 0])
+            bigQ = np.array([[8/k_e_square, 0, 0, 0],[0, 0, 0, 0],[0, 0, 0, 0],[0, 0, 0, 0]])
 
             self.A_U = np.array([[-1, (k / self.k_e_square), self.U*(-k / (2 * self.k_e_square)) * (self.k_plus_square - m_u**2), self.U*0],
                              
@@ -82,14 +129,17 @@ class Simulation:
             C_dot = (self.A_U @ self.C + self.C @ np.transpose(self.A_U) + self.epsilon * self.Q) 
             U_dot = (self.R - self.r_m * self.U)
 
-            
-            self.C += C_dot * self.dt
-            self.U += U_dot * self.dt
-            self.R = 0.25 * self.k * (self.k_plus_square - self.k_e_square) * self.C[0][2]
+            C_3Corr_dot = self.bigW @ self.C_3Corr + self.C_3Corr @ np.transpose(self.bigW) + self.U_3Corr * (self.bigL @ self.C_3Corr) + self.U_3Corr * (self.C_3Corr @ np.transpose(self.bigL)) + (self.epsilon * bigQ)  #fix the noise
+            U_3Corr_dot = self.R_3Corr - self.r_m * self.U_3Corr
+
+
 
             self.C_History[i] = self.C
             self.U_History[i] = self.U
+            self.U_History_3Corr[i] = self.U_3Corr
             self.R_History[i] = self.R
+
+            self.R_History_3Corr[i] = self.R_3Corr
 
     def make_plots(self):
 
@@ -98,9 +148,11 @@ class Simulation:
 
        
         axs[0].plot(time_array, self.U_History)
+        axs[0].plot(time_array, self.U_History_3Corr)
         axs[0].set_title(f"U History")
         axs[0].grid()
         axs[1].plot(time_array, self.R_History)
+        axs[1].plot(time_array, self.R_History_3Corr)
         axs[1].set_title(f"R Values")
         axs[1].grid()
 
@@ -111,6 +163,8 @@ class Simulation:
 if __name__ == "__main__":
     epsilon = 0.12394270273516043
     N_0_squared = 318.8640217310387
+    # epsilon = 0.01
+    # N_0_squared = 100
     r_m = 0.1
     k = 2 * np.pi * 6
     m = 2 * np.pi * 3
@@ -131,3 +185,5 @@ if __name__ == "__main__":
     print(sim.U_History[-1])
     print(sim.C_History[-1])
     sim.make_plots()
+    
+
