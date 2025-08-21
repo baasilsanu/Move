@@ -1,11 +1,10 @@
-import pandas as pd
+# import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import h5py
 from numba import jit
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
-from pympler import asizeof #TAKEOUT
 
 
 
@@ -179,16 +178,15 @@ if __name__ == "__main__":
     m = 2 * np.pi * 3
     m_u = 2 * np.pi * 7
     dt = 0.001
-    total_time = 2000
+    total_time = 200 #CHANGETHIS
 
-    num_simulations = 1#CHANGETHIS
+    num_simulations = 1 #CHANGETHIS
 
     epsilon_values = np.linspace(.06, .24, 10)
     N_0_squared_values = np.linspace(150, 640, 10)
 
 
     param_combinations = [(eps, n0) for eps in epsilon_values for n0 in N_0_squared_values]
-    param_combinations = [(.06, 150)] #TAKEOUT
     total_combinations = len(param_combinations)
 
     write_lock = Lock()
@@ -199,34 +197,32 @@ if __name__ == "__main__":
             with h5py.File(file_path, 'a') as hf:
 
                 run_group = hf.create_group(f"run_{run_id}") 
-                run_group.create_dataset("phi_e_history", data=sim.phi_e_history)
-                run_group.create_dataset("phi_plus_history", data=sim.phi_plus_history)
-                run_group.create_dataset("U_history", data=sim.U_history)
-                run_group.create_dataset("R_vals", data=sim.R_vals)
-                run_group.create_dataset("k_e_psi_e_vals", data=sim.k_e_psi_e_vals)
-                run_group.create_dataset("k_e_b_e_vals", data=sim.k_e_b_e_vals)
-                run_group.create_dataset("k_e_psi_plus_vals", data=sim.k_e_psi_plus_vals)
-                run_group.create_dataset("k_e_b_plus_vals", data=sim.k_e_b_plus_vals)
-                run_group.create_dataset("heat_flux_psi_e_b_e_vals", data=sim.heat_flux_psi_e_b_e_vals)
-                run_group.create_dataset("heat_flux_psi_e_b_plus_vals", data=sim.heat_flux_psi_e_b_plus_vals)
-                run_group.create_dataset("b_e_psi_plus_vals", data=sim.b_e_psi_plus_vals)
-                run_group.create_dataset("b_e_b_plus_vals", data=sim.b_e_b_plus_vals)
-                run_group.create_dataset("psi_plus_b_plus_vals", data=sim.psi_plus_b_plus_vals)
-                run_group.create_dataset("eta_batch", data=sim.eta_batch)
-                run_group.create_dataset("reversals", data=np.array(sim.reversals))
-                run_group.create_dataset("durations", data=np.array(sim.durations))
+                # run_group.create_dataset("phi_e_history", data=sim.phi_e_history)
+                # run_group.create_dataset("phi_plus_history", data=sim.phi_plus_history)
+                run_group.create_dataset("U_history", data=sim.U_history, compression="gzip", compression_opts = 9)
+                # run_group.create_dataset("R_vals", data=sim.R_vals)
+                # run_group.create_dataset("k_e_psi_e_vals", data=sim.k_e_psi_e_vals)
+                # run_group.create_dataset("k_e_b_e_vals", data=sim.k_e_b_e_vals)
+                # run_group.create_dataset("k_e_psi_plus_vals", data=sim.k_e_psi_plus_vals)
+                # run_group.create_dataset("k_e_b_plus_vals", data=sim.k_e_b_plus_vals)
+                # run_group.create_dataset("heat_flux_psi_e_b_e_vals", data=sim.heat_flux_psi_e_b_e_vals)
+                # run_group.create_dataset("heat_flux_psi_e_b_plus_vals", data=sim.heat_flux_psi_e_b_plus_vals)
+                # run_group.create_dataset("b_e_psi_plus_vals", data=sim.b_e_psi_plus_vals)
+                # run_group.create_dataset("b_e_b_plus_vals", data=sim.b_e_b_plus_vals)
+                # run_group.create_dataset("psi_plus_b_plus_vals", data=sim.psi_plus_b_plus_vals)
+                # run_group.create_dataset("eta_batch", data=sim.eta_batch)
+                run_group.create_dataset("reversals", data=np.array(sim.reversals), compression="gzip", compression_opts = 9)
+                run_group.create_dataset("durations", data=np.array(sim.durations), compression="gzip", compression_opts = 9)
 
     def run_simulations_for_combo(epsilon, N_0_squared, num_simulations, r_m, k, m, m_u, dt, total_time):
         """Runs all simulations for a single parameter combination and saves to a unique file."""
-        file_path = f"H5Data/runfile_eps_{epsilon:.2f}_n0_{N_0_squared:.2f}.h5"
+        file_path = f"H5DataLite/runfile_eps_{epsilon:.2f}_n0_{N_0_squared:.2f}.h5"
         for run_id in range(num_simulations):
             print(f"Running simulation {run_id} with epsilon: {epsilon}, N_0_squared: {N_0_squared}")
             sim = Simulation(epsilon, N_0_squared, r_m, k, m, m_u, dt, total_time)
             sim.simulate()
             sim.reversals, sim.durations = getTimesAndDurations(sim.U_history, sim.time_values, sim.total_time)
             save_simulation_to_hdf5(sim, file_path, run_id)
-            simsize = asizeof.asizeof(sim)#TAKEOUT
-            print("Size of this simulation object:", simsize) #TAKEOUT
             del sim 
 
     with ThreadPoolExecutor() as executor:
