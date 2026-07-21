@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from numba import jit
 import os
 import random
+import psycopg2
+import json
 
 @jit(nopython=True)
 def simulate_numba(num_steps, k_e_square, W_e, L_e_plus, W_plus, L_plus_e, eta_batch, dt, epsilon, r_m, k_plus_square):
@@ -163,7 +165,24 @@ class Simulation:
                 }
             last_reversal_index = index
         return reversal_data
+    
+    # def compress(self):
+    #     self.phi_e_history = self.phi_e_history[9::10]
+    #     self.phi_plus_history = self.phi_plus_history[9::10]
+    #     self.U_history = self.U_history[9::10]
+    #     self.R_vals = self.R_vals[9::10]
+    #     self.k_e_psi_e_vals = self.k_e_psi_e_vals[9::10]
+    #     self.k_e_b_e_vals = self.k_e_b_e_vals[9::10]
+    #     self.k_e_psi_plus_vals = self.k_e_psi_plus_vals[9::10]
+    #     self.k_e_b_plus_vals = self.k_e_b_plus_vals[9::10]
+    #     self.heat_flux_psi_e_b_e_vals = self.heat_flux_psi_e_b_e_vals[9::10]
+    #     self.heat_flux_psi_e_b_plus_vals = self.heat_flux_psi_e_b_plus_vals[9::10]
+    #     self.b_e_psi_plus_vals = self.b_e_psi_plus_vals[9::10]
+    #     self.b_e_b_plus_vals = self.b_e_b_plus_vals[9::10]
+    #     self.psi_plus_b_plus_vals = self.psi_plus_b_plus_vals[9::10]
+    #     self.eta_batch = self.eta_batch[9::10]
 
+        
 
 def average_arrays(*arrays):
     if not arrays:
@@ -179,42 +198,46 @@ def average_arrays(*arrays):
     
     return average_array
 
-def plot_composite_analysis(plotName, epsilon, N_0_squared, simulations, window_size=5000):
-    phi_e_list = []
-    phi_plus_list = []
-    U_list = []
-    R_list = []
-    k_e_psi_e_list = []
-    k_e_b_e_list = []
-    k_e_psi_plus_list = []
-    k_e_b_plus_list = []
-    heat_flux_psi_e_b_e_list = []
-    heat_flux_psi_e_b_plus_list = []
-    b_e_psi_plus_list = []
-    b_e_b_plus_list = []
-    psi_plus_b_plus_list = []
-    eta_list = []
+#This might still be useful to encapsulate the current aggregator into a function.
 
-    for sim in simulations:
-        reversal_data = sim.extract_reversal_data(window_size)
-        for key in reversal_data:
-            phi_e_list.append(reversal_data[key]['phi_e'])
-            phi_plus_list.append(reversal_data[key]['phi_plus'])
-            U_list.append(reversal_data[key]['U'])
-            R_list.append(reversal_data[key]['R'])
-            k_e_psi_e_list.append(reversal_data[key]['k_e_psi_e'])
-            k_e_b_e_list.append(reversal_data[key]['k_e_b_e'])
-            k_e_psi_plus_list.append(reversal_data[key]['k_e_psi_plus'])
-            k_e_b_plus_list.append(reversal_data[key]['k_e_b_plus'])
-            heat_flux_psi_e_b_e_list.append(reversal_data[key]['heat_flux_psi_e_b_e'])
-            heat_flux_psi_e_b_plus_list.append(reversal_data[key]['heat_flux_psi_e_b_plus'])
-            b_e_psi_plus_list.append(reversal_data[key]['b_e_psi_plus'])
-            b_e_b_plus_list.append(reversal_data[key]['b_e_b_plus'])
-            psi_plus_b_plus_list.append(reversal_data[key]['psi_plus_b_plus'])
-            eta_list.append(reversal_data[key]['eta'])
+# def reversal_data_aggregator(window_size=5000):
+#     phi_e_list = []
+#     phi_plus_list = []
+#     U_list = []
+#     R_list = []
+#     k_e_psi_e_list = []
+#     k_e_b_e_list = []
+#     k_e_psi_plus_list = []
+#     k_e_b_plus_list = []
+#     heat_flux_psi_e_b_e_list = []
+#     heat_flux_psi_e_b_plus_list = []
+#     b_e_psi_plus_list = []
+#     b_e_b_plus_list = []
+#     psi_plus_b_plus_list = []
+#     eta_list = []
 
+#     for sim in simulations:
+#         reversal_data = sim.extract_reversal_data(window_size)
+#         for key in reversal_data:
+#             phi_e_list.append(reversal_data[key]['phi_e'])
+#             phi_plus_list.append(reversal_data[key]['phi_plus'])
+#             U_list.append(reversal_data[key]['U'])
+#             R_list.append(reversal_data[key]['R'])
+#             k_e_psi_e_list.append(reversal_data[key]['k_e_psi_e'])
+#             k_e_b_e_list.append(reversal_data[key]['k_e_b_e'])
+#             k_e_psi_plus_list.append(reversal_data[key]['k_e_psi_plus'])
+#             k_e_b_plus_list.append(reversal_data[key]['k_e_b_plus'])
+#             heat_flux_psi_e_b_e_list.append(reversal_data[key]['heat_flux_psi_e_b_e'])
+#             heat_flux_psi_e_b_plus_list.append(reversal_data[key]['heat_flux_psi_e_b_plus'])
+#             b_e_psi_plus_list.append(reversal_data[key]['b_e_psi_plus'])
+#             b_e_b_plus_list.append(reversal_data[key]['b_e_b_plus'])
+#             psi_plus_b_plus_list.append(reversal_data[key]['psi_plus_b_plus'])
+#             eta_list.append(reversal_data[key]['eta'])
+
+
+def plot_composite_analysis(plotName, epsilon, N_0_squared, phi_e_list, phi_plus_list, U_list, R_list, k_e_psi_e_list, k_e_b_e_list, k_e_psi_plus_list, k_e_b_plus_list, heat_flux_psi_e_b_e_list, heat_flux_psi_e_b_plus_list, b_e_psi_plus_list, b_e_b_plus_list, psi_plus_b_plus_list, eta_list, dt,window_size=5000):
+   
     
-
 
     average_phi_e = average_arrays(*phi_e_list)
     average_phi_plus = average_arrays(*phi_plus_list)
@@ -233,7 +256,7 @@ def plot_composite_analysis(plotName, epsilon, N_0_squared, simulations, window_
 
 
 
-    time_array = np.arange(-window_size, window_size) * simulations[0].dt
+    time_array = np.arange(-window_size/10, window_size/10) * dt * 10
 
     fig, axs = plt.subplots(8, 2, figsize=(15, 40))
 
@@ -251,9 +274,9 @@ def plot_composite_analysis(plotName, epsilon, N_0_squared, simulations, window_
     axs[0, 1].set_title(f'Average b_e')
     axs[0, 1].grid()
 
-    for i in range(1):
-        #axs[1, 0].plot(time_array, phi_plus_list[i][:, 0],color = 'red') ##this line changed
-        axs[1, 0].plot(time_array, phi_plus_list[i][:, 0],'or') ##this line changed
+    for i in range(5):
+        axs[1, 0].plot(time_array, phi_plus_list[i][:, 0],linewidth=0.5, linestyle='--', color='gray') ##this line changed
+        # axs[1, 0].plot(time_array, phi_plus_list[i][:, 0],'or') ##this line changed
     axs[1, 0].plot(time_array, average_phi_plus[:, 0], label='Average', linewidth=1.5, color='blue')
     axs[1, 0].set_title(f'Average psi_plus')
     axs[1, 0].grid()
@@ -262,17 +285,6 @@ def plot_composite_analysis(plotName, epsilon, N_0_squared, simulations, window_
         axs[1, 1].plot(time_array, phi_plus_list[i][:, 1], linewidth=0.5, linestyle='--', color='gray')
     axs[1, 1].plot(time_array, average_phi_plus[:, 1], label='Average', linewidth=1.5, color='blue')
     axs[1, 1].set_title(f'Average b_plus')
-    axs[1, 1].grid()
-
-    for i in range(5):
-        axs[2, 0].plot(time_array, U_list[i], linewidth=0.5, linestyle='--', color='gray')
-    axs[2, 0].plot(time_array, average_U, label='Average', linewidth=1.5, color='blue')
-    axs[2, 0].set_title(f'Average U')
-    axs[2, 0].grid()
-
-    for i in range(5):
-        axs[2, 1].plot(time_array, R_list[i], linewidth=0.5, linestyle='--', color='gray')
-    axs[2, 1].plot(time_array, average_R, label='Average', linewidth=1.5, color='blue')
     axs[2, 1].set_title(f'Average R')
     axs[2, 1].grid()
 
@@ -339,7 +351,7 @@ def plot_composite_analysis(plotName, epsilon, N_0_squared, simulations, window_
     for i in range(5):
         axs[7, 1].plot(time_array, abs(eta_list[i]), linewidth=0.5, linestyle='--', color='gray')
     axs[7, 1].plot(time_array, average_eta, label='Average', linewidth=1.5, color='blue')
-    axs[7, 1].set_title(f'Average eta')
+    axs[7, 1].set_title(f'Average eta (Squared)')
     axs[7, 1].grid()
 
 
@@ -366,44 +378,46 @@ def split_list_randomly(l):
 
     return first_half, second_half
 
-def save_simulation_data(simulations, output_file='all_simulation_data.csv'):
-    nested_data = {
-        'simulation_index': [],
-        'U_history': [],
-        'R_vals': [],
-        'k_e_psi_e_vals': [],
-        'k_e_b_e_vals': [],
-        'k_e_psi_plus_vals': [],
-        'k_e_b_plus_vals': [],
-        'heat_flux_psi_e_b_e_vals': [],
-        'heat_flux_psi_e_b_plus_vals': [],
-        'b_e_psi_plus_vals': [],
-        'b_e_b_plus_vals': [],
-        'psi_plus_b_plus_vals': [],
-        'eta_batch': []
-    }
+#Needs rebuilding after the aggregator function changes 
 
-    for idx, sim in enumerate(simulations):
-        nested_data['simulation_index'].append(idx)
-        nested_data['U_history'].append(sim.U_history.tolist())
-        nested_data['R_vals'].append(sim.R_vals.tolist())
-        nested_data['k_e_psi_e_vals'].append(sim.k_e_psi_e_vals.tolist())
-        nested_data['k_e_b_e_vals'].append(sim.k_e_b_e_vals.tolist())
-        nested_data['k_e_psi_plus_vals'].append(sim.k_e_psi_plus_vals.tolist())
-        nested_data['k_e_b_plus_vals'].append(sim.k_e_b_plus_vals.tolist())
-        nested_data['heat_flux_psi_e_b_e_vals'].append(sim.heat_flux_psi_e_b_e_vals.tolist())
-        nested_data['heat_flux_psi_e_b_plus_vals'].append(sim.heat_flux_psi_e_b_plus_vals.tolist())
-        nested_data['b_e_psi_plus_vals'].append(sim.b_e_psi_plus_vals.tolist())
-        nested_data['b_e_b_plus_vals'].append(sim.b_e_b_plus_vals.tolist())
-        nested_data['psi_plus_b_plus_vals'].append(sim.psi_plus_b_plus_vals.tolist())
-        nested_data['eta_batch'].append(sim.eta_batch.flatten().tolist())
+# def save_simulation_data(simulations, output_file='all_simulation_data.csv'):
+#     nested_data = {
+#         'simulation_index': [],
+#         'U_history': [],
+#         'R_vals': [],
+#         'k_e_psi_e_vals': [],
+#         'k_e_b_e_vals': [],
+#         'k_e_psi_plus_vals': [],
+#         'k_e_b_plus_vals': [],
+#         'heat_flux_psi_e_b_e_vals': [],
+#         'heat_flux_psi_e_b_plus_vals': [],
+#         'b_e_psi_plus_vals': [],
+#         'b_e_b_plus_vals': [],
+#         'psi_plus_b_plus_vals': [],
+#         'eta_batch': []
+#     }
 
-    df = pd.DataFrame(nested_data)
-    df.to_csv(output_file, index=False)
-    print(f"All simulation data saved to {output_file}")
+#     for idx, sim in enumerate(simulations):
+#         nested_data['simulation_index'].append(idx)
+#         nested_data['U_history'].append(sim.U_history.tolist())
+#         nested_data['R_vals'].append(sim.R_vals.tolist())
+#         nested_data['k_e_psi_e_vals'].append(sim.k_e_psi_e_vals.tolist())
+#         nested_data['k_e_b_e_vals'].append(sim.k_e_b_e_vals.tolist())
+#         nested_data['k_e_psi_plus_vals'].append(sim.k_e_psi_plus_vals.tolist())
+#         nested_data['k_e_b_plus_vals'].append(sim.k_e_b_plus_vals.tolist())
+#         nested_data['heat_flux_psi_e_b_e_vals'].append(sim.heat_flux_psi_e_b_e_vals.tolist())
+#         nested_data['heat_flux_psi_e_b_plus_vals'].append(sim.heat_flux_psi_e_b_plus_vals.tolist())
+#         nested_data['b_e_psi_plus_vals'].append(sim.b_e_psi_plus_vals.tolist())
+#         nested_data['b_e_b_plus_vals'].append(sim.b_e_b_plus_vals.tolist())
+#         nested_data['psi_plus_b_plus_vals'].append(sim.psi_plus_b_plus_vals.tolist())
+#         nested_data['eta_batch'].append(sim.eta_batch.flatten().tolist())
+
+#     df = pd.DataFrame(nested_data)
+#     df.to_csv(output_file, index=False)
+#     print(f"All simulation data saved to {output_file}")
 
 if __name__ == "__main__":
-    simulations = []
+    # simulations = []
     compositeHalfList = []
     epsilon = 0.12394270273516043
     N_0_squared = 318.8640217310387
@@ -414,11 +428,87 @@ if __name__ == "__main__":
     dt = 0.001
     total_time = 200
 
-    for i in range(35):
+    phi_e_list = []
+    phi_plus_list = []
+    U_list = []
+    R_list = []
+    k_e_psi_e_list = []
+    k_e_b_e_list = []
+    k_e_psi_plus_list = []
+    k_e_b_plus_list = []
+    heat_flux_psi_e_b_e_list = []
+    heat_flux_psi_e_b_plus_list = []
+    b_e_psi_plus_list = []
+    b_e_b_plus_list = []
+    psi_plus_b_plus_list = []
+    eta_list = []
+
+    for i in range(3800):
         print(f"Running iteration {i}")
         sim = Simulation(epsilon, N_0_squared, r_m, k, m, m_u, dt, total_time)
         sim.simulate()
-        simulations.append(sim)
+        reversal_data = sim.extract_reversal_data(window_size=5000)
+        for key in reversal_data:
+            phi_e_list.append(reversal_data[key]['phi_e'][9::10])
+            phi_plus_list.append(reversal_data[key]['phi_plus'][9::10])
+            U_list.append(reversal_data[key]['U'][9::10])
+            R_list.append(reversal_data[key]['R'][9::10])
+            k_e_psi_e_list.append(reversal_data[key]['k_e_psi_e'][9::10])
+            k_e_b_e_list.append(reversal_data[key]['k_e_b_e'][9::10])
+            k_e_psi_plus_list.append(reversal_data[key]['k_e_psi_plus'][9::10])
+            k_e_b_plus_list.append(reversal_data[key]['k_e_b_plus'][9::10])
+            heat_flux_psi_e_b_e_list.append(reversal_data[key]['heat_flux_psi_e_b_e'][9::10])
+            heat_flux_psi_e_b_plus_list.append(reversal_data[key]['heat_flux_psi_e_b_plus'][9::10])
+            b_e_psi_plus_list.append(reversal_data[key]['b_e_psi_plus'][9::10])
+            b_e_b_plus_list.append(reversal_data[key]['b_e_b_plus'][9::10])
+            psi_plus_b_plus_list.append(reversal_data[key]['psi_plus_b_plus'][9::10])
+            eta_list.append(reversal_data[key]['eta'][9::10])
+        del sim
 
-    plot_composite_analysis("totalPlot", epsilon, N_0_squared, simulations)
+    conn = psycopg2.connect("dbname=simulations_data user=simulationuser password=simulations2024 host=localhost")
+    cur = conn.cursor()
+
+    # psi_e = [item[0] for item in phi_e_list]
+    # b_e = [item[1] for item in phi_e_list]
+    # psi_plus = [item[0] for item in phi_plus_list]
+    # b_plus = [item[1] for item in phi_plus_list]
+
+    for i in range(len(U_list)):
+
+        psi_e_json = json.dumps(phi_e_list[i][:, 0].tolist())
+        b_e_json = json.dumps(phi_e_list[i][:, 1].tolist())
+        psi_plus_json = json.dumps(phi_plus_list[i][:, 0].tolist())
+        b_plus_json = json.dumps(phi_plus_list[i][:, 1].tolist())
+        U_list_json = json.dumps(U_list[i].tolist())
+        R_list_json = json.dumps(R_list[i].tolist())
+        k_e_psi_e_list_json = json.dumps(k_e_psi_e_list[i].tolist())
+        k_e_b_e_list_json = json.dumps(k_e_b_e_list[i].tolist())
+        k_e_psi_plus_list_json = json.dumps(k_e_psi_plus_list[i].tolist())
+        k_e_b_plus_list_json = json.dumps(k_e_b_plus_list[i].tolist())
+        heat_flux_psi_e_b_e_list_json = json.dumps(heat_flux_psi_e_b_e_list[i].tolist())
+        heat_flux_psi_e_b_plus_list_json = json.dumps(heat_flux_psi_e_b_plus_list[i].tolist())
+        b_e_psi_plus_list_json = json.dumps(b_e_psi_plus_list[i].tolist())
+        b_e_b_plus_list_json = json.dumps(b_e_b_plus_list[i].tolist())
+        psi_plus_b_plus_list_json = json.dumps(psi_plus_b_plus_list[i].tolist())
+        eta_list_json = json.dumps(eta_list[i].tolist())
+
+    ##The variables in the for loop have weird names. They are not lists.
+
+        cur.execute("""
+        INSERT INTO composite_data (eps, n_0_squared, psi_e, b_e, psi_plus, b_plus, U_list, R_list, k_e_psi_e_list, 
+                                k_e_b_e_list, k_e_psi_plus_list, k_e_b_plus_list, heat_flux_psi_e_b_e_list, 
+                                heat_flux_psi_e_b_plus_list, b_e_psi_plus_list, b_e_b_plus_list, 
+                                psi_plus_b_plus_list, eta_list) 
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (epsilon, N_0_squared, psi_e_json, b_e_json, psi_plus_json, b_plus_json, U_list_json, R_list_json, 
+            k_e_psi_e_list_json, k_e_b_e_list_json, k_e_psi_plus_list_json, k_e_b_plus_list_json, 
+            heat_flux_psi_e_b_e_list_json, heat_flux_psi_e_b_plus_list_json, b_e_psi_plus_list_json, 
+            b_e_b_plus_list_json, psi_plus_b_plus_list_json, eta_list_json))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    print("Inserted batch into database")
+
+    # plot_composite_analysis("totalPlot", epsilon, N_0_squared, phi_e_list, phi_plus_list, U_list, R_list, k_e_psi_e_list, k_e_b_e_list, k_e_psi_plus_list, k_e_b_plus_list, heat_flux_psi_e_b_e_list, heat_flux_psi_e_b_plus_list, b_e_psi_plus_list, b_e_b_plus_list, psi_plus_b_plus_list, eta_list, dt,2000)
     # save_simulation_data(simulations)
